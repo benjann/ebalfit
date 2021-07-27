@@ -10,7 +10,7 @@ variance-covariance matrix computed by `ebalfit` is based on influence
 functions. The influence functions can be stored for further use, for example,
 to correct the standard errors of statistics computed from the reweighted data.
 
-To install `ebalfit` from the SSC Archive, type
+To install `ebalfit`, type
 
     . net install ebalfit, replace from(https://raw.githubusercontent.com/benjann/ebalfit/main/)
 
