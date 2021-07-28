@@ -117,6 +117,8 @@
     {p_end}
 {synopt :{opt dif:ficult}}use a different stepping algorithm in nonconcave
     regions{p_end}
+{synopt :{opt nostd}}omit standardization during estimation; not recommended
+    {p_end}
 {synopt :{opt nolog}}do not display iteration log
     {p_end}
 {synopt :{opt relax}}do not return error if convergence or balancing is not achieved
@@ -148,7 +150,7 @@
 {pstd}
     Entropy balancing can be expressed as a regression-like model with one
     coefficient for each balancing constraint. {cmd:ebalfit} estimates such a
-    model including the variance-covariance matrix of the estimates parameters. The
+    model including the variance-covariance matrix of the estimated parameters. The
     balancing weights are then obtained as predictions from this model. The
     variance-covariance matrix computed by {cmd:ebalfit} is based on influence
     functions (see section 3.8 in Jann 2020a). The influence functions can be
@@ -367,6 +369,10 @@
     the description of the {cmd:difficult} option in {helpb maximize}.
 
 {phang}
+    {cmd:nostd} omits standardization of the data during estimation. Specifying
+    {cmd:nostd} is not recommended.
+
+{phang}
     {opt nolog} suppresses the display of progress information.
 
 {phang}
@@ -456,6 +462,7 @@
 {synopt:{cmd:e(refsamp)}}reference subsample{p_end}
 {synopt:{cmd:e(ltype)}}{cmd:reldif} or {cmd:absdif}{p_end}
 {synopt:{cmd:e(difficult)}}{cmd:difficult} or empty{p_end}
+{synopt:{cmd:e(nostd)}}{cmd:nostd} or empty{p_end}
 {synopt:{cmd:e(generate)}}name of variable containing balancing weights{p_end}
 {synopt:{cmd:e(ifgenerate)}}names of variables containing influence functions{p_end}
 {synopt:{cmd:e(vce)}}{it:vcetype} specified in {cmd:vce()}{p_end}

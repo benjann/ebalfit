@@ -1,4 +1,4 @@
-*! version 1.0.0  27jul2021  Ben Jann
+*! version 1.0.1  28jul2021  Ben Jann
 
 capt findfile lmoremata.mlib
 if _rc {
@@ -109,7 +109,7 @@ program Estimate, eclass
         ITERate(numlist integer max=1 >=0 <=16000) ///
         PTOLerance(numlist max=1 >=0) ///
         VTOLerance(numlist max=1 >=0) ///
-        DIFficult NOLOG relax NOWARN ///
+        DIFficult NOSTD NOLOG relax NOWARN ///
         vce(str) NOSE CLuster(varname) ///
         Generate(name) IFgenerate(passthru) Replace ]
     if `"`by'"'!="" {
@@ -277,6 +277,7 @@ program Estimate, eclass
     eret scalar vtolerance = `vtolerance'
     eret scalar maxiter = `iterate'
     eret local difficult "`difficult'"
+    eret local nostd "`nostd'"
     eret matrix baltab = `BTAB'
     eret matrix _N = `_N'
     eret matrix _W = `_W'
@@ -540,6 +541,7 @@ void ebalfit()
     if (st_local("iterate")!="") S.maxiter(strtoreal(st_local("iterate")))
     else st_local("iterate", strofreal(S.maxiter()))
     S.difficult(st_local("difficult")!="")
+    S.nostd(st_local("nostd")!="")
     
     // run mm_eblance()
     S.data(X, w, Xref, wref, 1)
