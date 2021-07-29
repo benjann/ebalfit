@@ -23,6 +23,17 @@ is required. To install `moremata`, type
 
 Main changes:
 
+    29jul2021 (version 1.0.2)
+    - varlist only allowed elements such as -varname-, -c.varname-, or -i.varname-
+      if targets() was specified; this is fixed; factor-variable notation is now 
+      fully supported (apart from interactions) even if targets() is specified
+    - predict now has additional options -xb- (linear prediction) and -pr-
+      (propensity score)
+    - -norm- added as an additional ltype()
+    - option -alteval- added
+    - option trace() added (undocumented; specify tracelevel for Mata's optimize())
+    - vtolerance() was not passed through to the optimization; this is fixed
+
     28jul2021 (version 1.0.1)
     - option -nostd- added
 
