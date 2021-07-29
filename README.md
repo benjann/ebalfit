@@ -10,13 +10,20 @@ variance-covariance matrix computed by `ebalfit` is based on influence
 functions. The influence functions can be stored for further use, for example,
 to correct the standard errors of statistics computed from the reweighted data.
 
-To install `ebalfit`, type
+To install `ebalfit` from the SSC Archive, type
 
-    . net install ebalfit, replace from(https://raw.githubusercontent.com/benjann/ebalfit/main/)
+    . ssc install ebalfit, replace
 
 in Stata. Stata version 14 or newer is required. Furthermore, the `moremata` package
-is required. To install `moremata`, type
+is required. To install `moremata` from the SSC Archive, type
 
+    . ssc install moremata, replace
+
+---
+
+Installation from GitHub:
+
+    . net install ebalfit, replace from(https://raw.githubusercontent.com/benjann/ebalfit/main/)
     . net install moremata, replace from(https://raw.githubusercontent.com/benjann/moremata/master/)
 
 ---
