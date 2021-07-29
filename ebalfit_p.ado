@@ -1,17 +1,35 @@
-*! version 1.0.0  27jul2021  Ben Jann
+*! version 1.0.1  28jul2021  Ben Jann
 
 program ebalfit_p
     if `"`e(cmd)'"'!="ebalfit" {
         di as err "last ebalfit results not found"
         exit 301
     }
-    syntax [anything] [if] [in], [ IFs ]
+    local opts xb pr w
+    syntax [anything] [if] [in] [, `opts' IFs ]
+    local opt `xb' `pr' `w' `ifs'
+    if `:list sizeof opt'>1 {
+        di as err "`opt': only one allowed"
+        exit 198
+    }
     if `"`if'`in'"'!="" local iff `if' `in'
     else                local iff if e(sample)
     if "`ifs'"=="" {
-        syntax newvarname [if] [in]
+        syntax newvarname [if] [in] [, `opts' ]
+        // linear prediction
+        if "`opt'"=="xb" {
+            _predict double `typlist' `varlist' `iff', xb
+            exit
+        }
+        // propensity score
         tempname z
         qui _predict double `z' `iff', xb nolabel
+        if "`opt'"=="pr" {
+            gen `typlist' `varlist' = invlogit(`z') `iff'
+            lab var `varlist' "Propensity score"
+            exit
+        }
+        // balancing weights
         if `"`e(by)'"'!="" {
             local byval = substr(e(balsamp),1,strpos(e(balsamp),".")-1)
             qui replace `z' = 0 if `e(by)'!=`byval' & `z'<.

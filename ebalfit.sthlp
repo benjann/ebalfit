@@ -1,5 +1,5 @@
 {smcl}
-{* 27jul2021}{...}
+{* 29jul2021}{...}
 {hi:help ebalfit}{...}
 {right:{browse "http://github.com/benjann/ebalfit/"}}
 {hline}
@@ -23,7 +23,7 @@
     Syntax 2: adjust sample to population
 
 {p 8 15 2}
-    {cmd:ebalfit} {varlist} {ifin} {weight}{cmd:,} {cmdab:pop:ulation(}[{it:size}{cmd::}]{help numlist:{it:numlist}}{cmd:)}
+    {cmd:ebalfit} {varlist} {ifin} {weight}{cmd:,} {cmdab:pop:ulation(}[{it:popsize}{cmd::}]{help numlist:{it:numlist}}{cmd:)}
     [{cmd:,} {help ebalfit##opts:{it:options}} ]
 
 {pstd}
@@ -33,10 +33,14 @@
     {cmd:ebalfit} [{cmd:,} {help ebalfit##repopts:{it:reporting_options}} ]
 
 {pstd}
-    Generate balancing weights after estimation
+    Generate predictions after estimation
 
 {p 8 15 2}
-    {cmd:predict} [{help datatypes:{it:type}}] {newvar} {ifin}
+    {cmd:predict} [{help datatypes:{it:type}}] {newvar} {ifin} [{cmd:,} {cmd:w} {cmd:pr} {cmd:xb} ]
+
+            {cmd:w}    balancing weights (the default)
+            {cmd:pr}   propensity scores
+            {cmd:xb}   linear predictions
 
 {pstd}
     Generate influence functions after estimation
@@ -44,7 +48,7 @@
 {p 8 15 2}
     {cmd:predict} [{help datatypes:{it:type}}]
         {c -(}{help newvarlist##stub*:{it:stub}}{cmd:*} |
-        {it:{help newvar:newvar1}} {it:{help newvar:newvar2}} {cmd:...}{c )-}
+        {it:{help newvarlist}}{c )-}
         {ifin}{cmd:,} {opt if:s}
 
 
@@ -105,6 +109,8 @@
     {p_end}
 {synopt :{cmd:ltype(}{help ebalfit##ltype:{it:ltype}{cmd:)}}}type of loss function; default is
     {cmd:ltype(reldif)}
+    {p_end}
+{synopt :{opt alteval}}uses an alternative evaluator
     {p_end}
 {synopt :{opt iter:ate(#)}}maximum number of iterations;
     default is as set by {helpb set maxiter}
@@ -204,7 +210,7 @@
 {pmore}
     where {it:popsize} is the size of the population and {it:numlist} provides
     the population averages of the variables. {it:numlist} must contain one value
-    for each variable. If {it:popsize} omitted, it will be set to existing sum of
+    for each variable. If {it:popsize} omitted, it will be set to the existing sum of
     weights in the sample.
 
 {marker tar}{...}
@@ -224,22 +230,19 @@
     covariances is implemented by adding extra terms to
     {it:varlist} before running the balancing algorithm. For example, {cmd:variance} will add
     {cmd:c.}{it:varname}{cmd:#}{cmd:c.}{it:varname} for each continuous variable
-    in {it:varlist}. Likewise, {cmd:covariance} will add
+    in {it:varlist} (skipping omitted terms). Likewise, {cmd:covariance} will add
     {cmd:c.}{it:varname1}{cmd:#}{cmd:c.}{it:varname2} for each combination of
-    continuous variables. Factor variables specified as {cmd:i.}{it:varname}
-    will be ignored by {cmd:variance} and {cmd:skewness}, but
-    {cmd:covariance} will consider them and add appropriate
-    interaction terms such as {cmd:i.}{it:fvvar1}{cmd:#}{cmd:c.}{it:varname2}.
+    continuous variables. Factor variables will be ignored by 
+    {cmd:variance} and {cmd:skewness}, but {cmd:covariance} will consider them
+    and add appropriate interaction terms such as 
+    {cmd:1.}{it:fvvar}{cmd:#}{cmd:c.}{it:varname} (skipping base levels).
 
 {pmore}
-    If option {cmd:targets()} is specified, {it:varlist} may only contain
-    variables specified as {it:varname} (continuous variable),
-    {cmd:c.}{it:varname} (continuous variable; synonym to {it:varname}), or
-    {cmd:i.}{it:varname} (factor variable). Other elements of factor-variable
-    notation are not allowed in this case. However, if option {cmd:targets()}
-    is omitted, you can make full use of factor-variable notation (see
-    {helpb fvvarlist:[U] 11.4.3 Factor variables}). For example, you could
-    specify
+    If option {cmd:targets()} is specified, interaction terms such as 
+    {cmd:i.}{it:fvvar}{cmd:#}{cmd:c.}{it:varname} are not allowed in
+    {it:varlist}. However, interactions are allowed if option {cmd:targets()}
+    is omitted (see {helpb fvvarlist:[U] 11.4.3 Factor variables} for details
+    on notation). For example, you could type
 
             {com}c.hours##c.tenure i.south i.south#c.tenure{txt}
 
@@ -247,10 +250,9 @@
     to balance the means of {cmd:hours} and {cmd:tenure}, the covariance between
     {cmd:hours} and {cmd:tenure}, the proportions of the levels of {cmd:south},
     as well as the averages of {cmd:tenure} within levels of {cmd:south}. That is,
-    you can use extended factor-variable notation as an alternative to option
+    you can use interaction notation as an alternative to option
     {cmd:targets()} if you want to have more control over the exact configuration
     of moments to be balanced.
-
 
 {marker repoptions}{...}
 {dlgtab:Reporting}
@@ -338,13 +340,18 @@
 {phang}
     {opt btolerance(#)} sets the balancing tolerance. Balance is achieved if
     the balancing loss is smaller than the balancing tolerance. The
-    default is {bf:btolerance(1e-6)}.
+    default is {cmd:btolerance(1e-6)}.
 
 {marker ltype}{...}
 {phang}
     {opt ltype(ltype)} sets the type of loss function to be used. {it:ltype}
-    can be {cmd:reldif} (maximum relative difference) or {cmd:absdif} (maximum
-    absolute difference). The default is {cmd:reldif} .
+    can be {cmd:reldif} (maximum relative difference), {cmd:absdif} (maximum
+    absolute difference), or {cmd:norm} (norm of differences). The default is
+    {cmd:reldif}.
+
+{phang}
+    {opt alteval} uses an alternative evaluator based on an optimization criterion
+    defined in terms of the weights instead of the balancing differences.
 
 {phang}
     {opt iterate(#)} specifies the maximum number of iterations. Error will be returned
@@ -361,7 +368,8 @@
     {opt vtolerance(#)} specifies the convergence tolerance for the balancing
     loss. Convergence is reached if {cmd:ptolerance()} or {cmd:vtolerance()}
     is satisfied. See {helpb mf_optimize##i_ptol:optimize()} for details. The
-    default is {cmd:vtolerance(1e-7)}.
+    default is {cmd:vtolerance(1e-7)} or, if {cmd:alteval} has been specified,
+    {cmd:vtolerance(1e-10)}.
 
 {phang}
     {cmd:difficult} uses a different stepping algorithm in nonconcave. See
@@ -370,7 +378,7 @@
 
 {phang}
     {cmd:nostd} omits standardization of the data during estimation. Specifying
-    {cmd:nostd} is not recommended.
+    {cmd:nostd} is not recommended (unless {cmd:alteval} has been specified).
 
 {phang}
     {opt nolog} suppresses the display of progress information.

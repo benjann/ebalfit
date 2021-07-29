@@ -1,4 +1,4 @@
-*! version 1.0.1  28jul2021  Ben Jann
+*! version 1.0.2  29jul2021  Ben Jann
 
 capt findfile lmoremata.mlib
 if _rc {
@@ -105,13 +105,18 @@ program Estimate, eclass
     syntax varlist(numeric fv) [if] [in] [fw iw pw/], [ ///
         by(varname numeric) swap POOLed POPulation(str) ///
         TARgets(str) ///
-        BTOLerance(numlist max=1 >=0) ltype(name) ///
+        BTOLerance(numlist max=1 >=0) ltype(name) alteval ///
         ITERate(numlist integer max=1 >=0 <=16000) ///
         PTOLerance(numlist max=1 >=0) ///
         VTOLerance(numlist max=1 >=0) ///
         DIFficult NOSTD NOLOG relax NOWARN ///
+        trace(str) /// undocumented; overrides -nolog-
         vce(str) NOSE CLuster(varname) ///
         Generate(name) IFgenerate(passthru) Replace ]
+    if "`alteval'"!="" {
+        // default tolerance is a bit high for alteval
+        if "`vtolerance'"=="" local vtolerance 1e-10
+    }
     if `"`by'"'!="" {
         if `"`population'"'!="" {
             di as err "only one of by() and population() allowed"
@@ -167,9 +172,6 @@ program Estimate, eclass
     }
     Parse_vce `vce'
     Parse_targets, `targets'
-    if `targets' {
-        Parse_expand_varlist `t_var' `t_cov' `t_sk' `varlist'
-    }
     
     // sample and weights
     marksample touse
@@ -227,6 +229,9 @@ program Estimate, eclass
     // expand factor variables
     fvexpand `varlist' if `touse'
     local varlist `r(varlist)'
+    if `targets' {
+        Parse_expand_varlist `t_var' `t_cov' `t_sk' `varlist'
+    }
     if `"`population'"'!="" {
         if `: list sizeof population' < `: list sizeof varlist' {
             di as error "too few values specified in {bf:population()}"
@@ -277,6 +282,7 @@ program Estimate, eclass
     eret scalar vtolerance = `vtolerance'
     eret scalar maxiter = `iterate'
     eret local difficult "`difficult'"
+    eret local alteval "`alteval'"
     eret local nostd "`nostd'"
     eret matrix baltab = `BTAB'
     eret matrix _N = `_N'
@@ -340,48 +346,52 @@ program Parse_targets
 end
 
 program Parse_expand_varlist
-    gettoken var 0 : 0
-    gettoken cov 0 : 0
-    gettoken sk  0 : 0
-    local terms
-    foreach v of local 0 {
-        local isfv 0
-        local prefix = substr("`v'",1,2)
-        if "`prefix'"=="i." {
-            local isfv 1
-            local v = substr("`v'",3,.)
-        }
-        else if "`prefix'"=="c." {
-            local v = substr("`v'",3,.)
-        }
-        capt confirm variable `v'
-        if _rc {
-            di as err "invalid varlist ... targets()..."
+    gettoken var terms : 0
+    gettoken cov terms : terms
+    gettoken sk  terms : terms
+    local k: list sizeof terms
+    tempname flag
+    matrix `flag' = J(1, `k', 0)
+    matrix coln `flag' = `terms'
+    forv i = 1/`k' {
+        _ms_element_info, element(`i') matrix(`flag')
+        if `"`r(type)'"'=="interaction" {
+            di as err "interactions not allowed in {it:varlist} if"/*
+                */" {bf:targets()} is specified"
             exit 198
         }
-        if `isfv' local v "i.`v'"
-        else      local v "c.`v'"
-        local terms `terms' `v'
+        if `"`r(note)'"'!="" { // base, empty, or omitted
+            matrix `flag'[1,`i'] = 1
+        }
+        else if `"`r(type)'"'=="factor" {
+            matrix `flag'[1,`i'] = 2
+        }
     }
     local vlist
+    local i 0
     foreach v of local terms {
+        local ++i
         local vlist `vlist' `v'
-        if substr("`v'",1,2)=="i." continue
+        if `flag'[1,`i']!=0 continue // skip if omitted or factor
         if `var' {
-            local vlist `vlist' `v'#`v'
+            local vlist `vlist' c.`v'#c.`v'
         }
         if `sk' {
-            local vlist `vlist' `v'#`v'#`v'
+            local vlist `vlist' c.`v'#c.`v'#c.`v'
         }
     }
     if `cov' {
         local i 0
         foreach x of local terms {
             local ++i
+            if `flag'[1,`i']==1 continue // skip if omitted
+            if `flag'[1,`i']==0 local x `"c.`x'"' // continuous
             local j 0
             foreach y of local terms {
                 local ++j
-                if `i'==`j' continue, break
+                if `j'<=`i' continue
+                if `flag'[1,`j']==1 continue // skip if omitted
+                if `flag'[1,`j']==0 local y `"c.`y'"' // continuous
                 local vlist `vlist' `x'#`y'
             }
         }
@@ -390,12 +400,12 @@ program Parse_expand_varlist
 end
 
 program Parse_ltype
-    capt n syntax [, Reldif Absdif ]
+    capt n syntax [, Reldif Absdif Norm ]
     if _rc {
         di as err "error in option {bf:ltype()}"
         exit 198
     }
-    c_local ltype `reldif' `absdif'
+    c_local ltype `reldif' `absdif' `norm'
 end
 
 program Parse_ifgenerate
@@ -527,7 +537,8 @@ void ebalfit()
     
     // settings for mm_ebalance()
     relax = st_local("relax")!=""
-    if (st_local("nolog")!="") S.trace("none")
+    if (st_local("trace")!="")      S.trace(st_local("trace"))
+    else if (st_local("nolog")!="") S.trace("none")
     if (relax) S.nowarn(st_local("nowarn")!="")
     else       S.nowarn(1)
     if (st_local("ltype")!="") S.ltype(st_local("ltype"))
@@ -536,14 +547,15 @@ void ebalfit()
     else st_local("btolerance", strofreal(S.btol()))
     if (st_local("ptolerance")!="") S.ptol(strtoreal(st_local("ptolerance")))
     else st_local("ptolerance", strofreal(S.ptol()))
-    if (st_local("vtolerance")!="") S.ptol(strtoreal(st_local("vtolerance")))
+    if (st_local("vtolerance")!="") S.vtol(strtoreal(st_local("vtolerance")))
     else st_local("vtolerance", strofreal(S.vtol()))
     if (st_local("iterate")!="") S.maxiter(strtoreal(st_local("iterate")))
     else st_local("iterate", strofreal(S.maxiter()))
     S.difficult(st_local("difficult")!="")
+    S.alteval(st_local("alteval")!="")
     S.nostd(st_local("nostd")!="")
     
-    // run mm_eblance()
+    // run mm_ebalance()
     S.data(X, w, Xref, wref, 1)
     st_local("iter", strofreal(S.iter()))
     st_local("converged", strofreal(S.converged()))
