@@ -1,4 +1,4 @@
-*! version 1.0.2  29jul2021  Ben Jann
+*! version 1.0.3  03aug2021  Ben Jann
 
 capt findfile lmoremata.mlib
 if _rc {
@@ -104,7 +104,7 @@ program Estimate, eclass
     // syntax
     syntax varlist(numeric fv) [if] [in] [fw iw pw/], [ ///
         by(varname numeric) swap POOLed POPulation(str) ///
-        TARgets(str) ///
+        TARgets(str) tau(str) ///
         BTOLerance(numlist max=1 >=0) ltype(name) alteval ///
         ITERate(numlist integer max=1 >=0 <=16000) ///
         PTOLerance(numlist max=1 >=0) ///
@@ -172,6 +172,7 @@ program Estimate, eclass
     }
     Parse_vce `vce'
     Parse_targets, `targets'
+    Parse_tau `tau'
     
     // sample and weights
     marksample touse
@@ -254,7 +255,7 @@ program Estimate, eclass
         tempname WVAR
         qui gen double `WVAR' = .
     }
-    tempname b W LOSS BTAB CV DEFF _N _W
+    tempname b W LOSS TAU BTAB CV DEFF _N _W
     mata: ebalfit()
     
     // returns
@@ -273,6 +274,7 @@ program Estimate, eclass
     eret scalar cv = `CV'
     eret scalar deff = `DEFF'
     eret scalar loss = `LOSS'
+    eret scalar tau = `TAU'
     eret local ltype "`ltype'"
     eret scalar iter = `iter'
     eret scalar converged = `converged'
@@ -343,6 +345,24 @@ program Parse_targets
     c_local t_var = "`variance'"!=""
     c_local t_cov = "`covariance'"!=""
     c_local t_sk  = "`skewness'"!=""
+end
+
+program Parse_tau
+    if `"`0'"'=="" exit
+    capt numlist `"`0'"', min(1) max(1) range(>0)
+    if _rc==1 exit _rc
+    if _rc==0 {
+        c_local tau
+        c_local tau_num `0'
+        exit
+    }
+    local tau = strproper(`"`0'"')
+    if !inlist(`"`tau'"', "Wref", "W", "Nref", "N") {
+        di as err `"'`0'' not allowed in {bf:tau()}"'
+        exit 198
+    }
+    c_local tau "`tau'"
+    c_local tau_num
 end
 
 program Parse_expand_varlist
@@ -541,6 +561,8 @@ void ebalfit()
     else if (st_local("nolog")!="") S.trace("none")
     if (relax) S.nowarn(st_local("nowarn")!="")
     else       S.nowarn(1)
+    if  (st_local("tau_num")!="") S.tau(strtoreal(st_local("tau_num")))
+    else if (st_local("tau")!="") S.tau(st_local("tau"))
     if (st_local("ltype")!="") S.ltype(st_local("ltype"))
     else st_local("ltype", S.ltype())
     if (st_local("btolerance")!="") S.btol(strtoreal(st_local("btolerance")))
@@ -574,6 +596,7 @@ void ebalfit()
     if (S.k_omit()) _put_omit(cnm, S.omit())
     st_matrixcolstripe(st_local("b"), _cstripe(cnm' \ "_cons"))
     st_numscalar(st_local("LOSS"), S.loss())
+    st_numscalar(st_local("TAU"), S.tau())
     
     // sample sizes
     st_numscalar(st_local("W"), pooled ? S.Wref() : S.W()+S.Wref())

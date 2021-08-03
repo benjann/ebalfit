@@ -1,15 +1,16 @@
-*! version 1.0.1  28jul2021  Ben Jann
+*! version 1.0.3  03aug2021  Ben Jann
 
 program ebalfit_p
     if `"`e(cmd)'"'!="ebalfit" {
         di as err "last ebalfit results not found"
         exit 301
     }
-    local opts xb pr w
-    syntax [anything] [if] [in] [, `opts' IFs ]
-    local opt `xb' `pr' `w' `ifs'
+    local opts xb pr w u PScore
+    syntax [anything] [if] [in] [, `opts' IFs NOCons NOAlpha ]
+    if `"`pscore'"'!="" local pr pr
+    local opt `xb' `pr' `w' `u' `ifs'
     if `:list sizeof opt'>1 {
-        di as err "`opt': only one allowed"
+        di as err "only one option allowed"
         exit 198
     }
     if `"`if'`in'"'!="" local iff `if' `in'
@@ -25,15 +26,28 @@ program ebalfit_p
         tempname z
         qui _predict double `z' `iff', xb nolabel
         if "`opt'"=="pr" {
+            tempname W TAU
+            mat `W' = e(_W)
+            scalar `TAU' = e(tau)
+            if `TAU'!=`W'[1,2] {
+                qui replace `z' = `z' + ln(`W'[1,2]/`TAU') `iff'
+            }
             gen `typlist' `varlist' = invlogit(`z') `iff'
             lab var `varlist' "Propensity score"
             exit
         }
-        // balancing weights
+        // (raw) balancing weights
         if `"`e(by)'"'!="" {
             local byval = substr(e(balsamp),1,strpos(e(balsamp),".")-1)
             qui replace `z' = 0 if `e(by)'!=`byval' & `z'<.
         }
+        // - raw
+        if "`opt'"=="u" {
+            gen `typlist' `varlist' = exp(`z') `iff'
+            lab var `varlist' "Raw balancing weights"
+            exit
+        }
+        // - balancing weights
         if `"`e(wtype)'"'!="" {
             tempname w0
             qui gen double `w0' `e(wexp)' `iff'
@@ -45,6 +59,25 @@ program ebalfit_p
         lab var `varlist' "Balancing weights"
         exit
     }
+    // IFs
+    if "`nocons'"!="" local noalpha noalpha
+    // - parse newvarlist
+    capt syntax newvarlist [if] [in]
+    if _rc==1 exit _rc
+    if _rc {
+        tempname b
+        mat `b' = e(b)
+        mata: st_local("coleq", ///
+            invtokens("eq":+strofreal(1..cols(st_matrix("e(b)")))))
+        mat coleq `b' = `coleq'
+        if "`noalpha'"!="" {
+            matrix `b' = `b'[1,1..colsof(`b')-1]
+        }
+        _score_spec `anything', scores b(`b')
+        local varlist `s(varlist)'
+        local typlist `s(typlist)'
+    }
+    // - mark estimation sample
     tempname touse
     qui gen byte `touse' = e(sample)==1
     if `"`e(by)'"'!="" {
@@ -64,19 +97,8 @@ program ebalfit_p
         tempname w0
         qui gen double `w0' `e(wexp)' if `touse'
     }
+    // - compute IFs
     mata: ebalfit_p_IFs()
-    capt syntax newvarlist [if] [in]
-    if _rc==1 exit _rc
-    if _rc {
-        tempname b
-        mat `b' = e(b)
-        mata: st_local("coleq", ///
-            invtokens("eq":+strofreal(1..cols(st_matrix("e(b)")))))
-        mat coleq `b' = `coleq'
-        _score_spec `anything', scores b(`b')
-        local varlist `s(varlist)'
-        local typlist `s(typlist)'
-    }
     local coln: colnames e(b)
     foreach v of local varlist {
         gettoken typ typlist : typlist
@@ -95,9 +117,9 @@ mata set matastrict on
 
 void ebalfit_p_IFs()
 {
-    real scalar      k, pop, pooled, Wref
+    real scalar      k, pop, pooled, W, Wref, tau
     real colvector   b, w, wbal
-    real rowvector   mref, madj
+    real rowvector   mref
     real matrix      X, Xref
     string rowvector xvars, IFs
     string scalar    touse, touse1, touse0
@@ -109,9 +131,10 @@ void ebalfit_p_IFs()
     touse  = st_local("touse")
     touse1 = st_local("touse1")
     touse0 = st_local("touse0")
-    madj = st_matrix("e(baltab)")[,2]'
     mref = st_matrix("e(baltab)")[,3]'
+    W    = st_matrix("e(_W)")[1,1]
     Wref = st_matrix("e(_W)")[1,2]
+    tau  = st_numscalar("e(tau)")
     pop = st_global("e(by)")==""
     pooled = st_global("e(refsamp)")=="pooled"
     xvars = tokens(st_global("e(varlist)"))
@@ -139,14 +162,13 @@ void ebalfit_p_IFs()
     st_local("IFs", invtokens(IFs))
     
     // compute IFs
-    _mm_ebalance_IF_b(IF, X, Xref, w, wbal, mref)
-    _mm_ebalance_IF_a(IF, madj, w, wbal, Wref)
+    _mm_ebalance_IF_b(IF, X, Xref, w, wbal, mref, tau, Wref)
+    _mm_ebalance_IF_a(IF, X, w, wbal, tau, W)
     
     // copy IFs to tempvars
     if (pop) st_store(., IFs, touse, (IF.b, IF.a))
     else {
         st_store(., IFs, touse0, (IF.b0, IF.a0))
-        
         if (pooled) st_store(., IFs, touse1,
             st_data(., IFs, touse1) + (IF.b, IF.a))
         else st_store(., IFs, touse1, (IF.b, IF.a))

@@ -3,7 +3,7 @@ d ebalfit: Stata module to perform entropy balancing
 d 
 d Author: Ben Jann, University of Bern, ben.jann@unibe.ch
 d
-d Distribution-Date: 20210730
+d Distribution-Date: 20210803
 f ebalfit.sthlp
 f ebalfit_p.ado
 f ebalfit.ado

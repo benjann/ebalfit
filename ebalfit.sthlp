@@ -1,5 +1,5 @@
 {smcl}
-{* 29jul2021}{...}
+{* 02aug2021}{...}
 {hi:help ebalfit}{...}
 {right:{browse "http://github.com/benjann/ebalfit/"}}
 {hline}
@@ -36,11 +36,13 @@
     Generate predictions after estimation
 
 {p 8 15 2}
-    {cmd:predict} [{help datatypes:{it:type}}] {newvar} {ifin} [{cmd:,} {cmd:w} {cmd:pr} {cmd:xb} ]
+    {cmd:predict} [{help datatypes:{it:type}}] {newvar} {ifin} [{cmd:,} {cmd:w} {cmd:u} {cmd:pr} {opt ps:core} {cmd:xb} ]
 
-            {cmd:w}    balancing weights (the default)
-            {cmd:pr}   propensity scores
-            {cmd:xb}   linear predictions
+            {cmd:w}        balancing weights (the default)
+            {cmd:u}        raw balancing weights; {cmd:w} = {cmd:u} * {it:weight}
+            {cmd:pr}       propensity scores
+            {cmd:pscore}   synonym for {cmd:pr}
+            {cmd:xb}       linear predictions
 
 {pstd}
     Generate influence functions after estimation
@@ -49,7 +51,10 @@
     {cmd:predict} [{help datatypes:{it:type}}]
         {c -(}{help newvarlist##stub*:{it:stub}}{cmd:*} |
         {it:{help newvarlist}}{c )-}
-        {ifin}{cmd:,} {opt if:s}
+        {ifin}{cmd:,} {opt if:s} [ {opt noc:ons} {opt noa:lpha} ]
+
+            {cmd:nocons}   skip IF for {bf:_cons}
+            {cmd:noalpha}  synonym for {cmd:nocons}
 
 
 {synoptset 21 tabbed}{...}
@@ -63,6 +68,8 @@
 {synopt :{opt pool:ed}}use pooled sample as reference (syntay 1 only)
     {p_end}
 {synopt :{cmdab:pop:ulation(}{help ebalfit##pop:{it:spec}}{cmd:)}}provide population values (required in syntax 2)
+    {p_end}
+{synopt :{cmdab:tau(}{help ebalfit##tau:{it:spec}}{cmd:)}}specify custom target sum of weights
     {p_end}
 {synopt :{cmdab:tar:gets(}{help ebalfit##tar:{it:options}}{cmd:)}}specify types of moments to be balanced
     {p_end}
@@ -190,8 +197,8 @@
 {phang}
     {opt swap} swaps the subsamples (only allowed in syntax 1). By default, the
     lower value of {it:groupvar} identifies the subsample to be reweighted. Specify
-    {cmd:swap} to identify the subsample to be reweighted by the higher value of
-    {it:groupvar}.
+    {cmd:swap} to use the higher value of
+    {it:groupvar} as the subsample to be reweighted.
 
 {phang}
     {opt pooled} uses the pooled sample across both groups as the reference
@@ -210,8 +217,17 @@
 {pmore}
     where {it:popsize} is the size of the population and {it:numlist} provides
     the population averages of the variables. {it:numlist} must contain one value
-    for each variable. If {it:popsize} omitted, it will be set to the existing sum of
+    for each variable. If {it:popsize} is omitted, it will be set to the sum of
     weights in the sample.
+
+{marker tau}{...}
+{phang}
+    {opt tau(spec)} specifies a custom target sum of weights for the balancing 
+    weights within the reweighted sample. {it:spec} may either be {it:#} ({it:#}>0)
+    or one of {cmd:Wref} (sum of base weights in the reference sample), {cmd:W} 
+    (sum of base weights in the reweighted sample), {cmd:Nref} 
+    (number of rows the reference sample), or {cmd:N} (number of rows the reweighted 
+    sample). The default is {cmd:Wref}.
 
 {marker tar}{...}
 {phang}
@@ -241,16 +257,16 @@
     If option {cmd:targets()} is specified, interaction terms such as 
     {cmd:i.}{it:fvvar}{cmd:#}{cmd:c.}{it:varname} are not allowed in
     {it:varlist}. However, interactions are allowed if option {cmd:targets()}
-    is omitted (see {helpb fvvarlist:[U] 11.4.3 Factor variables} for details
-    on notation). For example, you could type
+    is omitted. For example, you could type
 
             {com}c.hours##c.tenure i.south i.south#c.tenure{txt}
 
 {pmore}
     to balance the means of {cmd:hours} and {cmd:tenure}, the covariance between
     {cmd:hours} and {cmd:tenure}, the proportions of the levels of {cmd:south},
-    as well as the averages of {cmd:tenure} within levels of {cmd:south}. That is,
-    you can use interaction notation as an alternative to option
+    as well as the averages of {cmd:tenure} within levels of {cmd:south} 
+    (see {helpb fvvarlist:[U] 11.4.3 Factor variables} for details on notation). That is,
+    you can use custom interactions as an alternative to option
     {cmd:targets()} if you want to have more control over the exact configuration
     of moments to be balanced.
 
@@ -319,17 +335,19 @@
     subsample and the reference subsample, using a copy of the base weights
     for the latter (or 1 if there are no base weights).
 
-{marker ifgenerate}{...}
+{marker ifgen}{...}
 {phang}
     {opt ifgenerate(names)} stores the influence functions of the
     coefficients. {it:names} is either a list of (new) variable names
     or {help newvarlist##stub*:{it:stub}}{cmd:*} to create names {it:stub}{cmd:1},
     {it:stub}{cmd:2}, etc. Alternatively, use command {cmd:predict} with option
-    {cmd:ifs} to generate the influence functions after estimation.
+    {cmd:ifs} to generate the influence functions after estimation. In any case, the
+    influence functions will be scaled in a way such that command {helpb total} can be
+    used to estimate the variance-covariance matrix.
 
 {phang}
     {opt nodescribe} suppresses the list of generated variables that is displayed
-    in the output by default.
+    in the output by default when {cmd:generate()} or {cmd:ifgenerate()} is specified.
 
 {phang}
     {opt replace} allows replacing existing variables.
@@ -345,13 +363,14 @@
 {marker ltype}{...}
 {phang}
     {opt ltype(ltype)} sets the type of loss function to be used. {it:ltype}
-    can be {cmd:reldif} (maximum relative difference), {cmd:absdif} (maximum
-    absolute difference), or {cmd:norm} (norm of differences). The default is
+    can be {cmdab:r:eldif} (maximum relative difference), {cmdab:a:bsdif} (maximum
+    absolute difference), or {cmdab:n:orm} (norm of differences). The default is
     {cmd:reldif}.
 
 {phang}
-    {opt alteval} uses an alternative evaluator based on an optimization criterion
-    defined in terms of the weights instead of the balancing differences.
+    {opt alteval} uses an optimization criterion defined terms of the distribution
+    of weights instead of the balancing loss from {cmd:ltype()}. Balancing loss will only be used
+    to evaluate the final fit.
 
 {phang}
     {opt iterate(#)} specifies the maximum number of iterations. Error will be returned
@@ -372,20 +391,22 @@
     {cmd:vtolerance(1e-10)}.
 
 {phang}
-    {cmd:difficult} uses a different stepping algorithm in nonconcave. See
+    {cmd:difficult} uses a different stepping algorithm in nonconcave regions. See
     the singular H methods in {helpb mf_optimize##i_singularH:optimize()} and
     the description of the {cmd:difficult} option in {helpb maximize}.
 
 {phang}
     {cmd:nostd} omits standardization of the data during estimation. Specifying
-    {cmd:nostd} is not recommended (unless {cmd:alteval} has been specified).
+    {cmd:nostd} is not recommended (unless {cmd:alteval} is also specified).
 
 {phang}
     {opt nolog} suppresses the display of progress information.
 
 {phang}
-    {opt relax} causes {cmd:ebalfit} to proceed even if convergence or balancing
-    is not achieved.
+    {opt relax} causes {cmd:ebalfit} to proceed even if convergence or balance
+    is not achieved. {cmd:ebalfit} uses formulas assuming balance when
+    computing influence functions and standard errors. The stored influence functions
+    and reported standard errors will be invalid if balance has not been achieved.
 
 {phang}
     {cmd:nowarn} suppresses any "convergence not achieved" or "balance not achieved"
@@ -445,6 +466,7 @@
 {synopt:{cmd:e(N_clust)}}number of clusters (if {cmd:vce(cluster)}){p_end}
 {synopt:{cmd:e(k_eq)}}number of equations in {cmd:e(b)} (always equal to 1){p_end}
 {synopt:{cmd:e(loss)}}balancing loss at final fit{p_end}
+{synopt:{cmd:e(tau)}}target sum of weights{p_end}
 {synopt:{cmd:e(iter)}}number of iterations{p_end}
 {synopt:{cmd:e(converged)}}1 if convergence achieved, 0 else{p_end}
 {synopt:{cmd:e(balanced)}}1 if balance achieved, 0 else{p_end}
@@ -486,7 +508,7 @@
 {synopt:{cmd:e(b)}}estimates{p_end}
 {synopt:{cmd:e(V)}}variance-covariance matrix of estimates (unless {cmd:nose}){p_end}
 {synopt:{cmd:e(_N)}}number of (physical) observations in subsamples{p_end}
-{synopt:{cmd:e(_W)}}sum of weight in subsamples{p_end}
+{synopt:{cmd:e(_W)}}sum of weights in subsamples{p_end}
 {synopt:{cmd:e(baltab)}}balancing table{p_end}
 
 {synoptset 20 tabbed}{...}

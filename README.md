@@ -30,6 +30,13 @@ Installation from GitHub:
 
 Main changes:
 
+    03aug2021 (version 1.0.3)
+    - new option tau() to set target sum of weights
+    - -pscore- now allowed as synonym for -pr-in predict
+    - new option -u- in predict to compute raw balancing weights (without base weights)
+    - new option -nocons-/-noalpha- in predict to skips IF for constant
+    - adaptions to take account of changes in moremata's mm_ebalance() function
+
     29jul2021 (version 1.0.2)
     - varlist only allowed elements such as -varname-, -c.varname-, or -i.varname-
       if targets() was specified; this is fixed; factor-variable notation is now 
