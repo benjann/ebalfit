@@ -1,5 +1,5 @@
 {smcl}
-{* 02aug2021}{...}
+{* 04aug2021}{...}
 {hi:help ebalfit}{...}
 {right:{browse "http://github.com/benjann/ebalfit/"}}
 {hline}
@@ -114,10 +114,11 @@
 {syntab :Optimization}
 {synopt :{opt btol:erance(#)}}balancing tolerance; default is {bf:1e-6}
     {p_end}
-{synopt :{cmd:ltype(}{help ebalfit##ltype:{it:ltype}{cmd:)}}}type of loss function; default is
+{synopt :{cmdab:lt:ype(}{help ebalfit##ltype:{it:ltype}{cmd:)}}}type of loss function; default is
     {cmd:ltype(reldif)}
     {p_end}
-{synopt :{opt alteval}}uses an alternative evaluator
+{synopt :{cmdab:et:ype(}{help ebalfit##etype:{it:etype}{cmd:)}}}evaluator type; default is
+    {cmd:etype(bl)}
     {p_end}
 {synopt :{opt iter:ate(#)}}maximum number of iterations;
     default is as set by {helpb set maxiter}
@@ -362,15 +363,20 @@
 
 {marker ltype}{...}
 {phang}
-    {opt ltype(ltype)} sets the type of loss function to be used. {it:ltype}
-    can be {cmdab:r:eldif} (maximum relative difference), {cmdab:a:bsdif} (maximum
-    absolute difference), or {cmdab:n:orm} (norm of differences). The default is
+    {opt ltype(ltype)} sets the type of loss function to be used to evaluate 
+    balancing. {it:ltype} can be {cmdab:r:eldif} (maximum relative difference), {cmdab:a:bsdif} (maximum
+    absolute difference), or {cmdab:n:orm} (Euclidean norm of differences). The default is
     {cmd:reldif}.
 
+{marker etype}{...}
 {phang}
-    {opt alteval} uses an optimization criterion defined terms of the distribution
-    of weights instead of the balancing loss from {cmd:ltype()}. Balancing loss will only be used
-    to evaluate the final fit.
+    {opt etype(etype)} selects the evaluator to be used to fit the 
+    coefficients. {it:etype} can be
+    {cmd:bl} (evaluator based on the balancing loss), {cmd:wl} (evaluator based
+    on distribution of weights), {cmd:mm} (method of moments evaluator), or
+    {cmd:mma} (method of moments evaluator including the intercept). The
+    default is {cmd:bl}. Irrespective of the choice of evaluator, balancing loss
+    will be used to evaluate the final fit.
 
 {phang}
     {opt iterate(#)} specifies the maximum number of iterations. Error will be returned
@@ -387,8 +393,8 @@
     {opt vtolerance(#)} specifies the convergence tolerance for the balancing
     loss. Convergence is reached if {cmd:ptolerance()} or {cmd:vtolerance()}
     is satisfied. See {helpb mf_optimize##i_ptol:optimize()} for details. The
-    default is {cmd:vtolerance(1e-7)} or, if {cmd:alteval} has been specified,
-    {cmd:vtolerance(1e-10)}.
+    default is {cmd:vtolerance(1e-7)} in case of {cmd:etype(bl)} and
+    {cmd:vtolerance(1e-10)} else.
 
 {phang}
     {cmd:difficult} uses a different stepping algorithm in nonconcave regions. See
@@ -397,7 +403,7 @@
 
 {phang}
     {cmd:nostd} omits standardization of the data during estimation. Specifying
-    {cmd:nostd} is not recommended (unless {cmd:alteval} is also specified).
+    {cmd:nostd} is not recommended.
 
 {phang}
     {opt nolog} suppresses the display of progress information.
@@ -465,6 +471,7 @@
 {synopt:{cmd:e(W)}}sum of weights{p_end}
 {synopt:{cmd:e(N_clust)}}number of clusters (if {cmd:vce(cluster)}){p_end}
 {synopt:{cmd:e(k_eq)}}number of equations in {cmd:e(b)} (always equal to 1){p_end}
+{synopt:{cmd:e(k_omit)}}number of omitted terms{p_end}
 {synopt:{cmd:e(loss)}}balancing loss at final fit{p_end}
 {synopt:{cmd:e(tau)}}target sum of weights{p_end}
 {synopt:{cmd:e(iter)}}number of iterations{p_end}
@@ -490,7 +497,8 @@
 {synopt:{cmd:e(by)}}name of variable identifying subsamples{p_end}
 {synopt:{cmd:e(balsamp)}}subsample to be reweighted{p_end}
 {synopt:{cmd:e(refsamp)}}reference subsample{p_end}
-{synopt:{cmd:e(ltype)}}{cmd:reldif} or {cmd:absdif}{p_end}
+{synopt:{cmd:e(ltype)}}{cmd:reldif}, {cmd:absdif}, or {cmd:norm}{p_end}
+{synopt:{cmd:e(etype)}}{cmd:bl}, {cmd:wl}, {cmd:mm}, or {cmd:mma}{p_end}
 {synopt:{cmd:e(difficult)}}{cmd:difficult} or empty{p_end}
 {synopt:{cmd:e(nostd)}}{cmd:nostd} or empty{p_end}
 {synopt:{cmd:e(generate)}}name of variable containing balancing weights{p_end}
@@ -507,6 +515,7 @@
 {p2col 5 20 24 2: Matrices}{p_end}
 {synopt:{cmd:e(b)}}estimates{p_end}
 {synopt:{cmd:e(V)}}variance-covariance matrix of estimates (unless {cmd:nose}){p_end}
+{synopt:{cmd:e(omit)}}indicator for omitted terms{p_end}
 {synopt:{cmd:e(_N)}}number of (physical) observations in subsamples{p_end}
 {synopt:{cmd:e(_W)}}sum of weights in subsamples{p_end}
 {synopt:{cmd:e(baltab)}}balancing table{p_end}

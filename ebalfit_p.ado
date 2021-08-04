@@ -118,7 +118,7 @@ mata set matastrict on
 void ebalfit_p_IFs()
 {
     real scalar      k, pop, pooled, W, Wref, tau
-    real colvector   b, w, wbal
+    real colvector   b, omit, w, wbal
     real rowvector   mref
     real matrix      X, Xref
     string rowvector xvars, IFs
@@ -155,6 +155,7 @@ void ebalfit_p_IFs()
     b = st_matrix("e(b)")'
     k = rows(b)
     wbal = w :* exp(X*b[|1\k-1|] :+ b[k])
+    omit = st_matrix("e(omit)")'
     
     // prepare tempvars
     IFs = st_tempname(k)
@@ -162,7 +163,7 @@ void ebalfit_p_IFs()
     st_local("IFs", invtokens(IFs))
     
     // compute IFs
-    _mm_ebalance_IF_b(IF, X, Xref, w, wbal, mref, tau, Wref)
+    _mm_ebalance_IF_b(IF, X, Xref, w, wbal, mref, tau, Wref, omit)
     _mm_ebalance_IF_a(IF, X, w, wbal, tau, W)
     
     // copy IFs to tempvars

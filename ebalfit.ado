@@ -105,7 +105,8 @@ program Estimate, eclass
     syntax varlist(numeric fv) [if] [in] [fw iw pw/], [ ///
         by(varname numeric) swap POOLed POPulation(str) ///
         TARgets(str) tau(str) ///
-        BTOLerance(numlist max=1 >=0) ltype(name) alteval ///
+        BTOLerance(numlist max=1 >=0) LType(name) EType(name) ///
+        alteval /// undocumented; kept for backward compatibility
         ITERate(numlist integer max=1 >=0 <=16000) ///
         PTOLerance(numlist max=1 >=0) ///
         VTOLerance(numlist max=1 >=0) ///
@@ -113,10 +114,6 @@ program Estimate, eclass
         trace(str) /// undocumented; overrides -nolog-
         vce(str) NOSE CLuster(varname) ///
         Generate(name) IFgenerate(passthru) Replace ]
-    if "`alteval'"!="" {
-        // default tolerance is a bit high for alteval
-        if "`vtolerance'"=="" local vtolerance 1e-10
-    }
     if `"`by'"'!="" {
         if `"`population'"'!="" {
             di as err "only one of by() and population() allowed"
@@ -157,7 +154,6 @@ program Estimate, eclass
         di as err "either by() or population() required"
         exit 198
     }
-    Parse_ltype, `ltype'
     if "`replace'"=="" & "`generate'"!="" {
         confirm new var `generate'
     }
@@ -173,6 +169,13 @@ program Estimate, eclass
     Parse_vce `vce'
     Parse_targets, `targets'
     Parse_tau `tau'
+    Parse_ltype, `ltype'
+    if "`alteval'"!="" & "`etype'"=="" local etype "wl"
+    Parse_etype, `etype'
+    if "`etype'"!="bl" {
+        if "`vtolerance'"=="" local vtolerance 1e-10
+        if "`etype'"=="wl"    local alteval "alteval"
+    }
     
     // sample and weights
     marksample touse
@@ -255,7 +258,7 @@ program Estimate, eclass
         tempname WVAR
         qui gen double `WVAR' = .
     }
-    tempname b W LOSS TAU BTAB CV DEFF _N _W
+    tempname b W LOSS TAU BTAB CV DEFF OMIT _N _W
     mata: ebalfit()
     
     // returns
@@ -271,11 +274,14 @@ program Estimate, eclass
     eret local varlist "`varlist'"
     eret scalar W = `W'
     eret scalar k_eq = 1
+    eret scalar k_omit = `k_omit'
     eret scalar cv = `CV'
     eret scalar deff = `DEFF'
     eret scalar loss = `LOSS'
     eret scalar tau = `TAU'
     eret local ltype "`ltype'"
+    eret local etype "`etype'"
+    eret local alteval "`alteval'"
     eret scalar iter = `iter'
     eret scalar converged = `converged'
     eret scalar balanced = `balanced'
@@ -284,11 +290,11 @@ program Estimate, eclass
     eret scalar vtolerance = `vtolerance'
     eret scalar maxiter = `iterate'
     eret local difficult "`difficult'"
-    eret local alteval "`alteval'"
     eret local nostd "`nostd'"
     eret matrix baltab = `BTAB'
     eret matrix _N = `_N'
     eret matrix _W = `_W'
+    eret matrix omit = `OMIT'
     if "`by'"!="" {
         eret local by `"`by'"'
         eret local balsamp "`by1'.`by'"
@@ -425,7 +431,20 @@ program Parse_ltype
         di as err "error in option {bf:ltype()}"
         exit 198
     }
-    c_local ltype `reldif' `absdif' `norm'
+    local ltype `reldif' `absdif' `norm'
+    if "`ltype'"=="" local ltype "reldif"
+    c_local ltype `ltype'
+end
+
+program Parse_etype
+    capt n syntax [, bl wl mm mma ]
+    if _rc {
+        di as err "error in option {bf:etype()}"
+        exit 198
+    }
+    local etype `bl' `wl' `mm' `mma'
+    if "`etype'"=="" local etype "bl"
+    c_local etype `etype'
 end
 
 program Parse_ifgenerate
@@ -563,8 +582,8 @@ void ebalfit()
     else       S.nowarn(1)
     if  (st_local("tau_num")!="") S.tau(strtoreal(st_local("tau_num")))
     else if (st_local("tau")!="") S.tau(st_local("tau"))
-    if (st_local("ltype")!="") S.ltype(st_local("ltype"))
-    else st_local("ltype", S.ltype())
+    S.ltype(st_local("ltype"))
+    S.etype(st_local("etype"))
     if (st_local("btolerance")!="") S.btol(strtoreal(st_local("btolerance")))
     else st_local("btolerance", strofreal(S.btol()))
     if (st_local("ptolerance")!="") S.ptol(strtoreal(st_local("ptolerance")))
@@ -574,7 +593,6 @@ void ebalfit()
     if (st_local("iterate")!="") S.maxiter(strtoreal(st_local("iterate")))
     else st_local("iterate", strofreal(S.maxiter()))
     S.difficult(st_local("difficult")!="")
-    S.alteval(st_local("alteval")!="")
     S.nostd(st_local("nostd")!="")
     
     // run mm_ebalance()
@@ -595,6 +613,9 @@ void ebalfit()
     cnm = vlist
     if (S.k_omit()) _put_omit(cnm, S.omit())
     st_matrixcolstripe(st_local("b"), _cstripe(cnm' \ "_cons"))
+    st_matrix(st_local("OMIT"), S.omit()')
+    st_matrixcolstripe(st_local("OMIT"), _cstripe(cnm'))
+    st_local("k_omit", strofreal(S.k_omit()))
     st_numscalar(st_local("LOSS"), S.loss())
     st_numscalar(st_local("TAU"), S.tau())
     
