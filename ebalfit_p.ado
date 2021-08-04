@@ -1,4 +1,4 @@
-*! version 1.0.3  03aug2021  Ben Jann
+*! version 1.0.4  03aug2021  Ben Jann
 
 program ebalfit_p
     if `"`e(cmd)'"'!="ebalfit" {

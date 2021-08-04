@@ -30,6 +30,11 @@ Installation from GitHub:
 
 Main changes:
 
+    04aug2021 (version 1.0.4)
+    - new etype() option to select the type of evaluator; option alteval is now 
+      undocumented
+    - indicators for omitted terms now returned in e(omit)
+
     03aug2021 (version 1.0.3)
     - new option tau() to set target sum of weights
     - -pscore- now allowed as synonym for -pr-in predict
