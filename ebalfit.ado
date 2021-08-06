@@ -1,4 +1,4 @@
-*! version 1.0.4  03aug2021  Ben Jann
+*! version 1.0.5  06aug2021  Ben Jann
 
 capt findfile lmoremata.mlib
 if _rc {
@@ -29,11 +29,13 @@ end
 
 program Get_diopts
     _parse comma lhs 0 : 0
-    syntax [, noHEADer NOTABle NODescribe BALtable BALtable2(passthru) * ]
+    syntax [, noHEADer NOWTABle NOTABle NODescribe BALtable ///
+        BALtable2(passthru) * ]
     _get_diopts diopts options, `options'
     _get_eformopts, soptions eformopts(`options') allowed(__all__)
     local options `s(options)'
-    c_local diopts `diopts' `s(eform)' `header' `notable' `baltable' `baltable2'
+    c_local diopts `diopts' `s(eform)' `header' `nowtable' `notable' /*
+         */`baltable' `baltable2'
     if `"`options'"'!="" local lhs `lhs', `options'
     c_local nodescribe `nodescribe'
     c_local 00 `lhs'
@@ -45,7 +47,7 @@ program Replay
         exit 301
     }
     if c(noisily)==0 exit
-    syntax [, noHeader NOTABle BALtable BALtable2(str) * ]
+    syntax [, noHeader NOTABle NOWTABle BALtable BALtable2(str) * ]
     if `"`baltable2'"'!="" local baltable baltable
     if "`header'"=="" {
         local w1 17
@@ -68,15 +70,13 @@ program Replay
             local refsamp = abbrev(e(refsamp),`w0')
             local w0 = max(strlen("`balsamp'"), strlen("`refsamp'"))
         }
-        di as txt _col(`c1') "Balancing loss" _col(`c2') "= " /*
-            */as res %10.0g e(loss)
-        di as txt _col(`c1') "Loss type" _col(`c2') "= " /*
-            */as res %10s e(ltype)
+        di as txt _col(`c1') "Evaluator" _col(`c2') "= " /*
+            */as res %10s e(etype)
         if `by' di as txt "Sample    = " as res %-`w0's "`balsamp'" /*
             */ as txt "`balobs'" _c
         else    di "" _c
-        di as txt _col(`c1') "CV of weights" _col(`c2') "= " /*
-            */as res %10.0g e(cv)
+        di as txt _col(`c1') "Loss type" _col(`c2') "= " /*
+            */as res %10s e(ltype)
         if `by' di as txt "Reference = " as res %-`w0's "`refsamp'" /*
             */ as txt "`refobs'" _c
         else    di "" _c
@@ -87,8 +87,15 @@ program Replay
             di as txt "Population size = " /*
                 */as res %-`w0'.0gc `popsize' _c
         }
-        di as txt _col(`c1') "DEFF of weights" _col(`c2') "= " /*
-            */as res %10.0g e(deff)
+        di as txt _col(`c1') "Balancing loss" _col(`c2') "= " /*
+            */as res %10.0g e(loss)
+    }
+    if "`nowtable'"=="" {
+        di _n as txt "{hline 23} balancing weights {hline 23}"
+        di as txt "   minimum    average    maximum      total         CV" /*
+            */ "       DEFF"
+        di as res %10.0g e(wmin) " " %10.0g e(wavg) " " %10.0g e(wmax) /*
+            */   " " %10.0g e(wsum) " " %10.0g e(cv)   " " %10.0g e(deff)
     }
     if "`notable'"=="" {
         di ""
@@ -258,7 +265,7 @@ program Estimate, eclass
         tempname WVAR
         qui gen double `WVAR' = .
     }
-    tempname b W LOSS TAU BTAB CV DEFF OMIT _N _W
+    tempname b W LOSS VAL TAU WSUM WAVG WMINMAX BTAB CV DEFF OMIT _N _W
     mata: ebalfit()
     
     // returns
@@ -275,20 +282,25 @@ program Estimate, eclass
     eret scalar W = `W'
     eret scalar k_eq = 1
     eret scalar k_omit = `k_omit'
+    eret scalar tau = `TAU'
+    eret scalar wsum = `WSUM'
+    eret scalar wavg = `WAVG'
+    eret scalar wmin = `WMINMAX'[1,1]
+    eret scalar wmax = `WMINMAX'[1,2]
     eret scalar cv = `CV'
     eret scalar deff = `DEFF'
+    eret scalar btolerance = `btolerance'
     eret scalar loss = `LOSS'
-    eret scalar tau = `TAU'
+    eret scalar balanced = `balanced'
+    eret scalar ptolerance = `ptolerance'
+    eret scalar vtolerance = `vtolerance'
+    eret scalar iter = `iter'
+    eret scalar maxiter = `iterate'
+    eret scalar value = `VAL'
+    eret scalar converged = `converged'
     eret local ltype "`ltype'"
     eret local etype "`etype'"
     eret local alteval "`alteval'"
-    eret scalar iter = `iter'
-    eret scalar converged = `converged'
-    eret scalar balanced = `balanced'
-    eret scalar btolerance = `btolerance'
-    eret scalar ptolerance = `ptolerance'
-    eret scalar vtolerance = `vtolerance'
-    eret scalar maxiter = `iterate'
     eret local difficult "`difficult'"
     eret local nostd "`nostd'"
     eret matrix baltab = `BTAB'
@@ -597,9 +609,6 @@ void ebalfit()
     
     // run mm_ebalance()
     S.data(X, w, Xref, wref, 1)
-    st_local("iter", strofreal(S.iter()))
-    st_local("converged", strofreal(S.converged()))
-    st_local("balanced", strofreal(S.balanced()))
     if (!relax) {
         if (S.converged()==0) exit(error(430))
         if (S.balanced()==0) {
@@ -607,6 +616,11 @@ void ebalfit()
             exit(430)
         }
     }
+    st_local("iter", strofreal(S.iter()))
+    st_local("converged", strofreal(S.converged()))
+    st_local("balanced", strofreal(S.balanced()))
+    st_numscalar(st_local("VAL"), S.value())
+    st_numscalar(st_local("LOSS"), S.loss())
     
     // store coefficients
     st_matrix(st_local("b"), (S.b()',S.a()))
@@ -616,8 +630,6 @@ void ebalfit()
     st_matrix(st_local("OMIT"), S.omit()')
     st_matrixcolstripe(st_local("OMIT"), _cstripe(cnm'))
     st_local("k_omit", strofreal(S.k_omit()))
-    st_numscalar(st_local("LOSS"), S.loss())
-    st_numscalar(st_local("TAU"), S.tau())
     
     // sample sizes
     st_numscalar(st_local("W"), pooled ? S.Wref() : S.W()+S.Wref())
@@ -627,13 +639,17 @@ void ebalfit()
     st_matrixcolstripe(st_local("_W"), _cstripe(("sample", "reference")'))
     
     // balancing table
-    st_matrix(st_local("BTAB"), (S.m()', S.madj()', S.mref()', abs(S.madj()-S.mref())', reldif(S.madj(),S.mref())'))
+    st_matrix(st_local("BTAB"), (S.m()', S.madj()', S.mu()', abs(S.madj()-S.mu())', reldif(S.madj(),S.mu())'))
     st_matrixrowstripe(st_local("BTAB"), _cstripe(vlist'))
-    st_matrixcolstripe(st_local("BTAB"), _cstripe(("raw","adjusted","reference","absdif", "reldif")'))
+    st_matrixcolstripe(st_local("BTAB"), _cstripe(("raw","adjusted","target","absdif", "reldif")'))
     
     // balancing weights
-    st_numscalar(st_local("CV"), sqrt(mm_variance0(S.wbal()))/mean(S.wbal()))
-    st_numscalar(st_local("DEFF"), S.N() / (quadsum(S.wbal())^2 / quadsum(S.wbal():^2)))
+    st_numscalar(st_local("TAU"), S.tau())
+    st_numscalar(st_local("WSUM"), S.wsum())
+    st_numscalar(st_local("WAVG"), S.wsum()/S.N())
+    st_matrix(st_local("WMINMAX"), minmax(S.wbal()))
+    st_numscalar(st_local("CV"), sqrt(mm_variance0(S.wbal()))/(S.wsum()/S.N()))
+    st_numscalar(st_local("DEFF"), S.N() / (quadsum(S.wsum())^2 / quadsum(S.wbal():^2)))
     if (st_local("WVAR")!="") {
         if (pop) st_store(., st_local("WVAR"), touse, S.wbal())
         else {

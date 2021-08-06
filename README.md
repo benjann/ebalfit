@@ -30,6 +30,12 @@ Installation from GitHub:
 
 Main changes:
 
+    06aug2021 (version 1.0.5)
+    - some changes to output and returns; a summary table of the balancing weights
+      is now displayed; type -nowtable- to suppress
+    - value of minimization criterion now returned in e(value)
+    - some adjustments to take account of changes in mm_ebalance()
+
     04aug2021 (version 1.0.4)
     - new etype() option to select the type of evaluator; option alteval is now 
       undocumented

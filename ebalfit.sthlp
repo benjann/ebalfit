@@ -1,5 +1,5 @@
 {smcl}
-{* 04aug2021}{...}
+{* 06aug2021}{...}
 {hi:help ebalfit}{...}
 {right:{browse "http://github.com/benjann/ebalfit/"}}
 {hline}
@@ -78,7 +78,9 @@
 {syntab :Reporting}
 {synopt :{opt l:evel(#)}}set confidence level; default is {cmd:level(95)}
     {p_end}
-{synopt :{opt nohead:er}}suppress table header
+{synopt :{opt nohead:er}}suppress header
+    {p_end}
+{synopt :{opt nowtab:le}}suppress summary table of balancing weights
     {p_end}
 {synopt :{opt notab:le}}suppress coefficient table
     {p_end}
@@ -126,8 +128,8 @@
 {synopt :{opt ptol:erance(#)}}convergence tolerance for coefficient
     vector; default is {bf:1e-6}
     {p_end}
-{synopt :{opt vtol:erance(#)}}convergence tolerance for the balancing
-    loss; default is {bf:1e-7}
+{synopt :{opt vtol:erance(#)}}convergence tolerance for the minimization
+    criterion; default is {bf:1e-7}
     {p_end}
 {synopt :{opt dif:ficult}}use a different stepping algorithm in nonconcave
     regions{p_end}
@@ -280,16 +282,19 @@
     {helpb set level}.
 
 {phang}
-    {opt noheader} suppresses the display of the table header.
+    {opt noheader} suppresses the display of the header.
 
 {phang}
-    {opt notable} suppresses the display of the table of results.
+    {opt nowtable} suppress the display of the summary table of balancing weights.
 
+{phang}
+    {opt notable} suppresses the display of the coefficient table.
 
 {marker displayopts}{...}
 {phang}
-    {it:display_options} are standard reporting options such as {cmd:eform},
-    {cmd:cformat()}, or {cmd:coeflegend}; see {help eform_option:{bf:[R]} {it:eform_option}} and
+    {it:display_options} are standard reporting options to be applied to the 
+    coefficient table, such as {cmd:eform}, {cmd:cformat()}, or 
+    {cmd:coeflegend}; see {help eform_option:{bf:[R]} {it:eform_option}} and
     the Reporting options in {helpb estimation options:[R] Estimation options}.
 
 {marker baltab}{...}
@@ -390,8 +395,8 @@
     default is {cmd:ptolerance(1e-6)}.
 
 {phang}
-    {opt vtolerance(#)} specifies the convergence tolerance for the balancing
-    loss. Convergence is reached if {cmd:ptolerance()} or {cmd:vtolerance()}
+    {opt vtolerance(#)} specifies the convergence tolerance for the minimization
+    criterion. Convergence is reached if {cmd:ptolerance()} or {cmd:vtolerance()}
     is satisfied. See {helpb mf_optimize##i_ptol:optimize()} for details. The
     default is {cmd:vtolerance(1e-7)} in case of {cmd:etype(bl)} and
     {cmd:vtolerance(1e-10)} else.
@@ -473,16 +478,21 @@
 {synopt:{cmd:e(k_eq)}}number of equations in {cmd:e(b)} (always equal to 1){p_end}
 {synopt:{cmd:e(k_omit)}}number of omitted terms{p_end}
 {synopt:{cmd:e(loss)}}balancing loss at final fit{p_end}
-{synopt:{cmd:e(tau)}}target sum of weights{p_end}
-{synopt:{cmd:e(iter)}}number of iterations{p_end}
-{synopt:{cmd:e(converged)}}1 if convergence achieved, 0 else{p_end}
+{synopt:{cmd:e(btolerance)}}setting from {cmd:btolerance()}{p_end}
 {synopt:{cmd:e(balanced)}}1 if balance achieved, 0 else{p_end}
+{synopt:{cmd:e(tau)}}target sum of weights{p_end}
+{synopt:{cmd:e(wsum)}}sum of balancing weights{p_end}
+{synopt:{cmd:e(wavg)}}average of balancing weights{p_end}
+{synopt:{cmd:e(wmin)}}minimum of balancing weights{p_end}
+{synopt:{cmd:e(wmax)}}maximum of balancing weights{p_end}
 {synopt:{cmd:e(cv)}}coefficient of variation of balancing weights{p_end}
 {synopt:{cmd:e(deff)}}DEFF (design effect) of balancing weights{p_end}
-{synopt:{cmd:e(btolerance)}}setting from {cmd:btolerance()}{p_end}
 {synopt:{cmd:e(ptoleranc)}}setting from {cmd:ptolerance()}{p_end}
 {synopt:{cmd:e(vtolerance)}}setting from {cmd:vtolerance()}{p_end}
 {synopt:{cmd:e(maxiter)}}setting from {cmd:iterate()}{p_end}
+{synopt:{cmd:e(iter)}}number of iterations{p_end}
+{synopt:{cmd:e(value)}}value of minimization criterion at final fit{p_end}
+{synopt:{cmd:e(converged)}}1 if convergence achieved, 0 else{p_end}
 {synopt:{cmd:e(df_m)}}model degrees of freedom (unless {cmd:nose}){p_end}
 {synopt:{cmd:e(chi2)}}chi-squared value of model test (unless {cmd:nose}){p_end}
 {synopt:{cmd:e(p)}}p-value for model test (unless {cmd:nose}){p_end}
