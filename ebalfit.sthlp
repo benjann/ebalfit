@@ -1,5 +1,5 @@
 {smcl}
-{* 06aug2021}{...}
+{* 16aug2021}{...}
 {hi:help ebalfit}{...}
 {right:{browse "http://github.com/benjann/ebalfit/"}}
 {hline}
@@ -58,7 +58,7 @@
 
 
 {synoptset 21 tabbed}{...}
-{marker opts}{col 5}{it:{help robreg##options:options}}{col 28}description
+{marker opts}{col 5}{it:{help ebalfit##options:options}}{col 28}description
 {synoptline}
 {syntab :Main}
 {synopt :{opt by(groupvar)}}identify subsamples (required in syntax 1)
@@ -71,7 +71,11 @@
     {p_end}
 {synopt :{cmdab:tau(}{help ebalfit##tau:{it:spec}}{cmd:)}}specify custom target sum of weights
     {p_end}
+{synopt :{cmdab:s:cales(}{help ebalfit##scales:{it:spec}}{cmd:)}}specify scales to be used for standardization
+    {p_end}
 {synopt :{cmdab:tar:gets(}{help ebalfit##tar:{it:options}}{cmd:)}}specify types of moments to be balanced
+    {p_end}
+{synopt :[{ul:{cmd:no}}]{cmdab:adj:ust(}{help ebalfit##adj:{it:numlist}}{cmd:)}}select terms to be balanced
     {p_end}
 
 {marker repopts}{...}
@@ -88,7 +92,7 @@
     reporting options as described in
     {helpb estimation options:[R] estimation options}
     {p_end}
-{synopt :{opt bal:tab}[{cmd:(}{help ebalfit##baltab:{it:options}}{cmd:)}]}display balancing table
+{synopt :{opt bal:tab}}display balancing table
     {p_end}
 
 {syntab :VCE/SE}
@@ -169,10 +173,9 @@
     model including the variance-covariance matrix of the estimated parameters. The
     balancing weights are then obtained as predictions from this model. The
     variance-covariance matrix computed by {cmd:ebalfit} is based on influence
-    functions (see section 3.8 in Jann 2020a). The influence functions can be
+    functions. The influence functions can be
     stored for further use, for example, to correct the standard errors of
-    statistics computed from the reweighted data (e.g. section 3.7.9 in
-    Jann 2020b).
+    statistics computed from the reweighted data.
 
 {pstd}
     The heavy lifting is done by function {helpb mf_mm_ebalance:mm_ebalance()}
@@ -183,6 +186,10 @@
 {pstd}
     For an alternative implementation of entropy balancing in Stata
     see {helpb ebalance} by Hainmueller and Xu (2011, 2013).
+
+{pstd}
+    For methods and formulas implemented in {cmd:ebalfit} see
+    {browse "http://ideas.repec.org/p/bss/wpaper/39.html":Jann (2021)}.
 
 
 {marker options}{...}
@@ -232,6 +239,23 @@
     (number of rows the reference sample), or {cmd:N} (number of rows the reweighted 
     sample). The default is {cmd:Wref}.
 
+{marker scales}{...}
+{phang}
+    {opt scales(spec)} determines the scales to be used for standardization during
+    estimation (unless {cmd:nostd} is specified) and for computation of 
+    standardized differences in the balancing table. {it:spec}
+    may either be a {it:{help numlist}} containing custom values (one for each
+    term in the model; the values must be positive) or, alternatively, 
+    {cmdab:m:ain} (use standard deviations from the main sample), 
+    {cmdab:r:eference} (use standard deviations from the reference sample),
+    {cmdab:a:verage} (use standard deviations averaged between the two samples), 
+    {cmdab:w:average} (use standard deviations averaged between the two
+    samples, weighted by sample size), {cmdab:p:ooled} (use standard deviations
+    from the pooled sample). {cmd:reference}, {cmd:average}, {cmd:waverage}, 
+    and {cmd:pooled} are only allowed in syntax 1. Standard deviations are
+    computed using population formulas (division by N rather than N-1). Scales
+    equal to 0 will be reset to 1. The default is {cmd:main}.
+
 {marker tar}{...}
 {phang}
      {opt targets(options)} specifies the types of moments to be balanced. {it:options}
@@ -273,6 +297,17 @@
     {cmd:targets()} if you want to have more control over the exact configuration
     of moments to be balanced.
 
+{marker adj}{...}
+{phang}
+     [{cmd:no}]{opth adjust(numlist)} selects the terms to be balanced. Use this
+     option if you want to construct weights such that only a subset of terms is
+     adjusted, while keeping the others fixed. {it:numlist} provides the indices
+     of the relevant terms. For example, in a model with three variables, to adjust
+     the means of the first two variables and keep the mean of the third variable
+     fixed, type {cmd:adjust(1 2)} or, equivalently, {cmd:noadjust(3)}. Keeping
+     terms fixed leads to different results than excluding the terms from the
+     model.
+
 {marker repoptions}{...}
 {dlgtab:Reporting}
 
@@ -299,12 +334,11 @@
 
 {marker baltab}{...}
 {phang}
-    {cmd:baltab}[{cmd:(}{it:options}{cmd:)}] displays a balancing table in addition
+    {cmd:baltab} displays a balancing table in addition
     to the table of coefficients. The balancing table contains for each term
-    the raw mean and the reweighted mean, the target value for the
-    reweighted mean, as well as the absolute difference and the "relative"
-    difference (see {helpb reldif()}) between the reweighted mean and the target
-    value. {it:options} are as described in {helpb _matrix_table}.
+    the target value, the unbalanced value, the standardized difference between
+    the target value and the unbalanced value, the balanced value, and the 
+    standardized difference between the target value and the balanced value.
 
 {dlgtab:VCE/SE}
 
@@ -507,10 +541,14 @@
 {synopt:{cmd:e(by)}}name of variable identifying subsamples{p_end}
 {synopt:{cmd:e(balsamp)}}subsample to be reweighted{p_end}
 {synopt:{cmd:e(refsamp)}}reference subsample{p_end}
+{synopt:{cmd:e(adjust)}}indices of adjusted terms, or {cmd:"."} (all){p_end}
+{synopt:{cmd:e(noadjust)}}indices of non-adjusted terms{p_end}
 {synopt:{cmd:e(ltype)}}{cmd:reldif}, {cmd:absdif}, or {cmd:norm}{p_end}
 {synopt:{cmd:e(etype)}}{cmd:bl}, {cmd:wl}, {cmd:mm}, or {cmd:mma}{p_end}
 {synopt:{cmd:e(difficult)}}{cmd:difficult} or empty{p_end}
 {synopt:{cmd:e(nostd)}}{cmd:nostd} or empty{p_end}
+{synopt:{cmd:e(scale)}}{cmd:main}, {cmd:reference}, {cmd:average}, 
+{cmd:waverage}, {cmd:pooled}, or {cmd:user}{p_end}
 {synopt:{cmd:e(generate)}}name of variable containing balancing weights{p_end}
 {synopt:{cmd:e(ifgenerate)}}names of variables containing influence functions{p_end}
 {synopt:{cmd:e(vce)}}{it:vcetype} specified in {cmd:vce()}{p_end}
@@ -526,6 +564,7 @@
 {synopt:{cmd:e(b)}}estimates{p_end}
 {synopt:{cmd:e(V)}}variance-covariance matrix of estimates (unless {cmd:nose}){p_end}
 {synopt:{cmd:e(omit)}}indicator for omitted terms{p_end}
+{synopt:{cmd:e(scales)}}scales used for standardization{p_end}
 {synopt:{cmd:e(_N)}}number of (physical) observations in subsamples{p_end}
 {synopt:{cmd:e(_W)}}sum of weights in subsamples{p_end}
 {synopt:{cmd:e(baltab)}}balancing table{p_end}
@@ -555,14 +594,9 @@
     54(7):1-18. DOI: {browse "http://doi.org/10.18637/jss.v054.i07":10.18637/jss.v054.i07}
     {p_end}
 {phang}
-    Jann, B. (2020a). Influence functions continued. A framework for estimating standard errors in reweighting,
-    matching, and regression adjustment. University of Bern Social Sciences Working Papers 35. Available from
-    {browse "http://ideas.repec.org/p/bss/wpaper/35.html"}.
-    {p_end}
-{phang}
-    Jann, B. (2020b). Relative distribution analysis in Stata. University of Bern Social Sciences Working
-    Papers 37. Available from
-    {browse "http://ideas.repec.org/p/bss/wpaper/37.html"}.
+    Jann, B. (2021). Entropy balancing as an estimation command. University of 
+    Bern Social Sciences Working Papers 39. Available from
+    {browse "http://ideas.repec.org/p/bss/wpaper/39.html"}.
     {p_end}
 
 
@@ -572,11 +606,20 @@
     Ben Jann, University of Bern, ben.jann@unibe.ch
 
 {pstd}
-    Thanks for citing this software as follows:
+    Thanks for citing this software as
 
 {pmore}
-    Jann, B. (2021). ebalfit: Stata module to perform entropy balancing. Available
-    from http://github.com/benjann/ebalfit/.
+    Jann, B. (2021). ebalfit: Stata module to perform entropy balancing. Statistical
+    Software Components S458975, Boston College Department of Economics. Available
+    from {browse "http://ideas.repec.org/c/boc/bocode/s458975.html"}.
+
+{pstd}
+    or
+
+{pmore}
+    Jann, B. (2021). Entropy balancing as an estimation command. University of 
+    Bern Social Sciences Working Papers 39. Available from
+    {browse "http://ideas.repec.org/p/bss/wpaper/39.html"}.
 
 
 {title:Also see}

@@ -1,4 +1,4 @@
-*! version 1.0.5  06aug2021  Ben Jann
+*! version 1.0.6  14aug2021  Ben Jann
 
 program ebalfit_p
     if `"`e(cmd)'"'!="ebalfit" {
@@ -119,7 +119,7 @@ void ebalfit_p_IFs()
 {
     real scalar      k, pop, pooled, W, Wref, tau
     real colvector   b, omit, w, wbal
-    real rowvector   mu, madj
+    real rowvector   mu, madj, adj, noadj
     real matrix      X, Xref
     string rowvector xvars, IFs
     string scalar    touse, touse1, touse0
@@ -131,8 +131,8 @@ void ebalfit_p_IFs()
     touse  = st_local("touse")
     touse1 = st_local("touse1")
     touse0 = st_local("touse0")
-    madj = st_matrix("e(baltab)")[,2]'
-    mu   = st_matrix("e(baltab)")[,3]'
+    mu   = st_matrix("e(baltab)")[,1]'
+    madj = st_matrix("e(baltab)")[,4]'
     W    = st_matrix("e(_W)")[1,1]
     Wref = st_matrix("e(_W)")[1,2]
     tau  = st_numscalar("e(tau)")
@@ -157,6 +157,8 @@ void ebalfit_p_IFs()
     k = rows(b)
     wbal = w :* exp(X*b[|1\k-1|] :+ b[k])
     omit = st_matrix("e(omit)")'
+    adj = strtoreal(tokens(st_global("e(adjust)")))
+    noadj = strtoreal(tokens(st_global("e(noadjust)")))
     
     // prepare tempvars
     IFs = st_tempname(k)
@@ -164,7 +166,8 @@ void ebalfit_p_IFs()
     st_local("IFs", invtokens(IFs))
     
     // compute IFs
-    _mm_ebalance_IF_b(IF, X, Xref, w, wbal, madj, mu, tau, Wref, omit)
+    _mm_ebalance_IF_b(IF, X, Xref, w, wbal, madj, mu, tau, W, Wref, adj, noadj,
+        omit)
     _mm_ebalance_IF_a(IF, X, w, wbal, tau, W)
     
     // copy IFs to tempvars

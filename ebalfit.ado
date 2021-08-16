@@ -1,4 +1,4 @@
-*! version 1.0.5  06aug2021  Ben Jann
+*! version 1.0.6  14aug2021  Ben Jann
 
 capt findfile lmoremata.mlib
 if _rc {
@@ -29,13 +29,11 @@ end
 
 program Get_diopts
     _parse comma lhs 0 : 0
-    syntax [, noHEADer NOWTABle NOTABle NODescribe BALtable ///
-        BALtable2(passthru) * ]
+    syntax [, noHEADer NOWTABle NOTABle NODescribe BALtable * ]
     _get_diopts diopts options, `options'
     _get_eformopts, soptions eformopts(`options') allowed(__all__)
     local options `s(options)'
-    c_local diopts `diopts' `s(eform)' `header' `nowtable' `notable' /*
-         */`baltable' `baltable2'
+    c_local diopts `diopts' `s(eform)' `header' `nowtable' `notable' `baltable'
     if `"`options'"'!="" local lhs `lhs', `options'
     c_local nodescribe `nodescribe'
     c_local 00 `lhs'
@@ -47,8 +45,7 @@ program Replay
         exit 301
     }
     if c(noisily)==0 exit
-    syntax [, noHeader NOTABle NOWTABle BALtable BALtable2(str) * ]
-    if `"`baltable2'"'!="" local baltable baltable
+    syntax [, noHeader NOTABle NOWTABle BALtable * ]
     if "`header'"=="" {
         local w1 17
         local c1 49
@@ -72,7 +69,7 @@ program Replay
         }
         di as txt _col(`c1') "Evaluator" _col(`c2') "= " /*
             */as res %10s e(etype)
-        if `by' di as txt "Sample    = " as res %-`w0's "`balsamp'" /*
+        if `by' di as txt "Main      = " as res %-`w0's "`balsamp'" /*
             */ as txt "`balobs'" _c
         else    di "" _c
         di as txt _col(`c1') "Loss type" _col(`c2') "= " /*
@@ -103,7 +100,20 @@ program Replay
     }
     if "`baltable'"!="" {
         di as txt _n "Balancing table"
-        _matrix_table e(baltab), `baltable2'
+        mata: st_local("twidth", strofreal( ///
+            max((12, min((st_numscalar("c(linesize)")-59, ///
+                max(strlen(st_matrixrowstripe("e(baltab)")[,2]))))))))
+        matlist e(baltab), twidth(`twidth') border(rows) ///
+            aligncolnames(center) showcoleq(combined) noblank
+        // if `"`e(by)'"'!="" {
+        //     local scale `"`e(scale)'"'
+        //     if `"`scale'"'!="user" {
+        //         di as txt "std. dif.: scales based on " _c
+        //         if      `"`scale'"'=="average"  di as txt "average between samples"
+        //         else if `"`scale'"'=="waverage" di as txt "weighted average between samples"
+        //         else di as txt `"`scale' sample"'
+        //     }
+        // }
     }
 end
 
@@ -111,7 +121,8 @@ program Estimate, eclass
     // syntax
     syntax varlist(numeric fv) [if] [in] [fw iw pw/], [ ///
         by(varname numeric) swap POOLed POPulation(str) ///
-        TARgets(str) tau(str) ///
+        TARgets(str) tau(str) Scales(str) ///
+        ADJust(numlist int sort >=1) NOADJust(numlist int sort >=1) ///
         BTOLerance(numlist max=1 >=0) LType(name) EType(name) ///
         alteval /// undocumented; kept for backward compatibility
         ITERate(numlist integer max=1 >=0 <=16000) ///
@@ -176,12 +187,17 @@ program Estimate, eclass
     Parse_vce `vce'
     Parse_targets, `targets'
     Parse_tau `tau'
+    Parse_scales `by':`scales'
     Parse_ltype, `ltype'
     if "`alteval'"!="" & "`etype'"=="" local etype "wl"
     Parse_etype, `etype'
     if "`etype'"!="bl" {
         if "`vtolerance'"=="" local vtolerance 1e-10
         if "`etype'"=="wl"    local alteval "alteval"
+    }
+    if "`adjust'"!="" & "`noadjust'"!="" {
+        di as err "{bf:adjust()} and {bf:noadjust()} not both allowed"
+        exit 198
     }
     
     // sample and weights
@@ -249,6 +265,13 @@ program Estimate, eclass
             exit 198
         }
     }
+    if `"`scales_num'"'!="" {
+        if `:list sizeof scales_num'!=`:list sizeof varlist' {
+            di as err "number scales specified in {bf:scales()} does not"/*
+                */ " match number of terms in model"
+            exit 498
+        }
+    }
     
     // expand generate_stub, if necessary
     if "`ifgenerate_stub'"!="" {
@@ -265,7 +288,7 @@ program Estimate, eclass
         tempname WVAR
         qui gen double `WVAR' = .
     }
-    tempname b W LOSS VAL TAU WSUM WAVG WMINMAX BTAB CV DEFF OMIT _N _W
+    tempname b W LOSS VAL TAU WSUM WAVG WMINMAX BTAB CV DEFF OMIT SCALES _N _W
     mata: ebalfit()
     
     // returns
@@ -279,6 +302,8 @@ program Estimate, eclass
     eret local predict "ebalfit_p"
     eret local title "Entropy balancing"
     eret local varlist "`varlist'"
+    eret local adjust "`adjust'"
+    eret local noadjust "`noadjust'"
     eret scalar W = `W'
     eret scalar k_eq = 1
     eret scalar k_omit = `k_omit'
@@ -303,10 +328,12 @@ program Estimate, eclass
     eret local alteval "`alteval'"
     eret local difficult "`difficult'"
     eret local nostd "`nostd'"
+    eret local scale "`scale'"
     eret matrix baltab = `BTAB'
     eret matrix _N = `_N'
     eret matrix _W = `_W'
     eret matrix omit = `OMIT'
+    eret matrix scales = `SCALES'
     if "`by'"!="" {
         eret local by `"`by'"'
         eret local balsamp "`by1'.`by'"
@@ -381,6 +408,50 @@ program Parse_tau
     }
     c_local tau "`tau'"
     c_local tau_num
+end
+
+program Parse_scales
+    _on_colon_parse `0'
+    local by `"`s(before)'"'
+    local 0 `"`s(after)'"'
+    if `"`0'"'=="" {
+        c_local scale  "main"
+        c_local scales "main"   // for mata
+        exit
+    }
+    capt numlist `"`0'"', min(1) range(>=0)
+    if _rc==1 exit _rc
+    if _rc==0 {
+        c_local scales_num `r(numlist)'
+        c_local scale  "user"
+        c_local scales "user"   // for mata
+        exit
+    }
+    local 0 `", `0'"'
+    capt n syntax [, Main Reference Average Waverage Pooled ]
+    if _rc==1 exit _rc
+    if _rc {
+        di as err "error in option {bf:scales()}"
+        exit _rc
+    }
+    local scale `main' `reference' `average' `waverage' `pooled'
+    if "`scale'"=="" local scale "main"
+    if `:list sizeof scale'>1 {
+        di as err "only one keyword allowed in {bf:scales()}"
+        exit 198
+    }
+    if `"`by'"'=="" {
+        if "`scale'"!="main" {
+            di as err "{bf:scales(`scale')} only allowed with {bf:by()}"
+            exit 198
+        }
+    }
+    if      "`scale'"=="reference" local scales "ref"
+    else if "`scale'"=="average"   local scales "avg"
+    else if "`scale'"=="waverage"  local scales "wavg"
+    else                           local scales "`scale'"
+    c_local scale "`scale'"
+    c_local scales "`scales'"   // for mata
 end
 
 program Parse_expand_varlist
@@ -594,6 +665,22 @@ void ebalfit()
     else       S.nowarn(1)
     if  (st_local("tau_num")!="") S.tau(strtoreal(st_local("tau_num")))
     else if (st_local("tau")!="") S.tau(st_local("tau"))
+    if  (st_local("scales_num")!="") S.scale(strtoreal(tokens(st_local("scales_num"))))
+    else                             S.scale(st_local("scales"))
+    if (st_local("adjust")!="") {
+        S.adj(strtoreal(tokens(st_local("adjust"))))
+        if (max(S.adj())>length(vlist)) {
+            stata(`"di as err "{bf:adjust()} contains elements that are out of range""')
+            exit(498)
+        }
+    }
+    else if (st_local("noadjust")!="") {
+        S.noadj(strtoreal(tokens(st_local("noadjust"))))
+        if (max(S.noadj())>length(vlist)) {
+            stata(`"di as err "{bf:noadjust()} contains elements that are out of range""')
+            exit(498)
+        }
+    }
     S.ltype(st_local("ltype"))
     S.etype(st_local("etype"))
     if (st_local("btolerance")!="") S.btol(strtoreal(st_local("btolerance")))
@@ -634,14 +721,28 @@ void ebalfit()
     // sample sizes
     st_numscalar(st_local("W"), pooled ? S.Wref() : S.W()+S.Wref())
     st_matrix(st_local("_N"), (S.N(), S.Nref()))
-    st_matrixcolstripe(st_local("_N"), _cstripe(("sample", "reference")'))
+    st_matrixcolstripe(st_local("_N"), _cstripe(("main", "reference")'))
     st_matrix(st_local("_W"), (S.W(), S.Wref()))
-    st_matrixcolstripe(st_local("_W"), _cstripe(("sample", "reference")'))
+    st_matrixcolstripe(st_local("_W"), _cstripe(("main", "reference")'))
     
     // balancing table
-    st_matrix(st_local("BTAB"), (S.m()', S.madj()', S.mu()', abs(S.madj()-S.mu())', reldif(S.madj(),S.mu())'))
+    st_matrix(st_local("BTAB"), (S.mu()',
+        S.m()',    ((S.m()-S.mu()):/S.scale())',
+        S.madj()', ((S.madj()-S.mu()):/S.scale())') /*\
+        (S.tau(), S.W(), S.W()-S.tau(), S.wsum(), S.wsum()-S.tau())*/)
     st_matrixrowstripe(st_local("BTAB"), _cstripe(vlist'))
-    st_matrixcolstripe(st_local("BTAB"), _cstripe(("raw","adjusted","target","absdif", "reldif")'))
+    //st_matrixrowstripe(st_local("BTAB"), 
+    //    ((J(length(vlist),1,"means")\"weights"), (vlist' \ "total")))
+    st_matrixcolstripe(st_local("BTAB"), 
+        ("Target",    "value")  \
+        ("Unbalanced","value")  \
+        ("Unbalanced","std. dif.")\
+        ("Balanced",  "value")  \
+        ("Balanced",  "std. dif."))
+    st_matrix(st_local("SCALES"), S.scale())
+    st_matrixcolstripe(st_local("SCALES"), _cstripe(cnm'))
+    st_local("adjust", invtokens(strofreal(S.adj())))
+    st_local("noadjust", invtokens(strofreal(S.noadj())))
     
     // balancing weights
     st_numscalar(st_local("TAU"), S.tau())

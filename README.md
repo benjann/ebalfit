@@ -30,6 +30,11 @@ Installation from GitHub:
 
 Main changes:
 
+    16aug2021 (version 1.0.6)
+    - option [no]adjust() added
+    - option scales() added
+    - changes to content and layout of e(baltab)
+
     06aug2021 (version 1.0.5)
     - some changes to output and returns; a summary table of the balancing weights
       is now displayed; type -nowtable- to suppress
